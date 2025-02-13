@@ -85,6 +85,16 @@ export async function getCourseForCourseEdit(id: string) {
   });
 }
 
+export async function getCoursesForProducts() {
+  "use cache";
+  cacheTag(getCourseGlobalTag());
+
+  return db.query.CourseTable.findMany({
+    columns: { id: true, name: true },
+    orderBy: asc(CourseTable.name),
+  });
+}
+
 export async function insertCourse(data: typeof CourseTable.$inferInsert) {
   const [newCourse] = await db.insert(CourseTable).values(data).returning();
 
