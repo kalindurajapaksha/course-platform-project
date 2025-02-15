@@ -3,6 +3,11 @@ import { CourseSectionTable } from "@/drizzle/schema";
 import { revalidateCourseSectionCache } from "./cache/courseSections";
 import { desc, eq } from "drizzle-orm";
 
+export const wherePublicCourseSections = eq(
+  CourseSectionTable.status,
+  "public"
+);
+
 export async function getNextCourseSectionOrder(courseId: string) {
   const section = await db.query.CourseSectionTable.findFirst({
     columns: { order: true },

@@ -1,7 +1,12 @@
 import { db } from "@/drizzle/db";
 import { CourseSectionTable, LessonTable } from "@/drizzle/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { revalidateLessonCache } from "./cache/lessons";
+
+export const wherePublicLessons = or(
+  eq(LessonTable.status, "public"),
+  eq(LessonTable.status, "preview")
+);
 
 export async function getNextLessonOrder(sectionId: string) {
   const lesson = await db.query.LessonTable.findFirst({

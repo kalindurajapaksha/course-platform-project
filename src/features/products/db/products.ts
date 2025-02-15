@@ -1,16 +1,25 @@
 import { db } from "@/drizzle/db";
 import {
   CourseProductTable,
+  CourseSectionTable,
+  LessonTable,
   ProductTable,
   PurchaseTable,
 } from "@/drizzle/schema";
-import { asc, countDistinct, eq } from "drizzle-orm";
+import { and, asc, countDistinct, eq } from "drizzle-orm";
 import { cacheTag } from "next/dist/server/use-cache/cache-tag";
 import {
   getProductGlobalTag,
   getProductIdTag,
   revalidateProductCache,
 } from "./cache/products";
+import { wherePublicCourseSections } from "@/features/courseSections/db/sections";
+import { wherePublicLessons } from "@/features/lessons/db/lessons";
+import { getLessonCourseTag } from "@/features/lessons/db/cache/lessons";
+import { getCourseSectionCourseTag } from "@/features/courseSections/db/cache/courseSections";
+import { getCourseIdTag } from "@/features/courses/db/cache/courses";
+
+export const wherePublicProducts = eq(ProductTable.status, "public");
 
 export async function getProductsForProductTable() {
   "use cache";
@@ -56,6 +65,79 @@ export async function getProductForEdit(id: string) {
       },
     },
   });
+}
+
+export async function getPublicProducts() {
+  "use cache";
+  cacheTag(getProductGlobalTag());
+  return db.query.ProductTable.findMany({
+    columns: {
+      id: true,
+      name: true,
+      description: true,
+      priceInDollars: true,
+      imageUrl: true,
+    },
+    where: wherePublicProducts,
+    orderBy: asc(ProductTable.name),
+  });
+}
+
+export async function getPublicProduct(id: string) {
+  "use cache";
+  cacheTag(getProductIdTag(id));
+  const product = await db.query.ProductTable.findFirst({
+    columns: {
+      id: true,
+      name: true,
+      description: true,
+      priceInDollars: true,
+      imageUrl: true,
+    },
+    where: and(eq(ProductTable.id, id), wherePublicProducts),
+    with: {
+      courseProducts: {
+        with: {
+          course: {
+            columns: {
+              id: true,
+              name: true,
+            },
+            with: {
+              courseSections: {
+                columns: { id: true, name: true },
+                where: wherePublicCourseSections,
+                orderBy: asc(CourseSectionTable.order),
+                with: {
+                  lessons: {
+                    columns: { id: true, name: true, status: true },
+                    where: wherePublicLessons,
+                    orderBy: asc(LessonTable.order),
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (product == null) return product;
+
+  cacheTag(
+    ...product.courseProducts.flatMap((cp) => [
+      getLessonCourseTag(cp.course.id),
+      getCourseSectionCourseTag(cp.course.id),
+      getCourseIdTag(cp.course.id),
+    ])
+  );
+
+  const { courseProducts, ...rest } = product;
+  return {
+    ...rest,
+    courses: courseProducts.map((cp) => cp.course),
+  };
 }
 
 export async function insertProduct(
