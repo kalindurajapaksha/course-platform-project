@@ -1,11 +1,17 @@
 import { UserRole } from "@/drizzle/schema";
 import { getUser } from "@/features/users/db/users";
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
 const client = await clerkClient();
 
 export async function getCurrentUser({ allData = false } = {}) {
   const { userId, sessionClaims, redirectToSignIn } = await auth();
+
+  if (userId != null && sessionClaims?.dbId == null) {
+    redirect("/api/clerk/syncUsers");
+  }
+
   return {
     clerkUserId: userId,
     userId: sessionClaims?.dbId,

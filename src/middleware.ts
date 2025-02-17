@@ -1,9 +1,8 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { forbidden, notFound } from "next/navigation";
 import arcjet, { detectBot, shield, slidingWindow } from "@arcjet/next";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 import { env } from "./data/env/server";
 import { setUserCountryHeader } from "./lib/userCountryHeader";
-import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -38,11 +37,12 @@ export default clerkMiddleware(async (auth, req) => {
       : req
   );
 
-  if (decision.isDenied()) return forbidden();
+  if (decision.isDenied()) return new NextResponse(null, { status: 403 });
 
   if (isAdminRoute(req)) {
     const user = await auth.protect();
-    if (user.sessionClaims.role !== "admin") return notFound();
+    if (user.sessionClaims.role !== "admin")
+      return new NextResponse(null, { status: 404 });
   }
   if (!isPublicRoute(req)) {
     await auth.protect();

@@ -140,6 +140,21 @@ export async function getPublicProduct(id: string) {
   };
 }
 
+export async function getPublicProductForPurchase(id: string) {
+  "use cache";
+  cacheTag(getProductIdTag(id));
+  return db.query.ProductTable.findFirst({
+    columns: {
+      id: true,
+      name: true,
+      description: true,
+      priceInDollars: true,
+      imageUrl: true,
+    },
+    where: and(eq(ProductTable.id, id), wherePublicProducts),
+  });
+}
+
 export async function insertProduct(
   data: typeof ProductTable.$inferInsert & { courseIds: string[] }
 ) {
