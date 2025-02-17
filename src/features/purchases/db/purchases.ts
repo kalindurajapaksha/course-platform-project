@@ -1,8 +1,12 @@
 import { db } from "@/drizzle/db";
 import { PurchaseTable } from "@/drizzle/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { cacheTag } from "next/dist/server/use-cache/cache-tag";
-import { getPurchaseUserTag, revalidatePurchaseCache } from "./cache/purchases";
+import {
+  getPurchaseIdTag,
+  getPurchaseUserTag,
+  revalidatePurchaseCache,
+} from "./cache/purchases";
 
 export async function getUserOwnsProduct({
   userId,
@@ -13,6 +17,7 @@ export async function getUserOwnsProduct({
 }) {
   "use cache";
   cacheTag(getPurchaseUserTag(userId));
+
   const existingPurchase = await db.query.PurchaseTable.findFirst({
     where: and(
       eq(PurchaseTable.userId, userId),
@@ -22,6 +27,45 @@ export async function getUserOwnsProduct({
   });
 
   return existingPurchase != null;
+}
+
+export async function getPurchase({
+  userId,
+  id,
+}: {
+  userId: string;
+  id: string;
+}) {
+  "use cache";
+  cacheTag(getPurchaseIdTag(id));
+
+  return db.query.PurchaseTable.findFirst({
+    columns: {
+      pricePaidInCents: true,
+      refundedAt: true,
+      productDetails: true,
+      createdAt: true,
+      stripeSessionId: true,
+    },
+    where: and(eq(PurchaseTable.id, id), eq(PurchaseTable.userId, userId)),
+  });
+}
+
+export async function getPurchases(userId: string) {
+  "use cache";
+  cacheTag(getPurchaseUserTag(userId));
+
+  return db.query.PurchaseTable.findMany({
+    columns: {
+      id: true,
+      productDetails: true,
+      pricePaidInCents: true,
+      refundedAt: true,
+      createdAt: true,
+    },
+    where: eq(PurchaseTable.userId, userId),
+    orderBy: desc(PurchaseTable.createdAt),
+  });
 }
 
 export async function insertPurchase(

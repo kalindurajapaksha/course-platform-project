@@ -6,7 +6,7 @@ import { insertPurchase } from "@/features/purchases/db/purchases";
 import { getUser } from "@/features/users/db/users";
 import { stripeServerClient } from "@/services/stripe/stripeServer";
 import { redirect } from "next/navigation";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 export async function GET(request: NextRequest) {
@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
   } catch {
     redirectUrl = "/products/purchase-failure";
   }
-  //   return NextResponse.redirect(new URL(redirectUrl, request.url))
-  redirect(redirectUrl);
+  return NextResponse.redirect(new URL(redirectUrl, request.url));
 }
 export async function POST(request: NextRequest) {
   const event = await stripeServerClient.webhooks.constructEvent(
