@@ -19,7 +19,7 @@ function Navbar() {
     <header className="flex h-12 shadow bg-background z-10">
       <nav className="flex gap-4 container">
         <div className="mr-auto flex items-center gap-2">
-          <Link className="text-lg hover:underline" href="/">
+          <Link className="text-lg hover:underline" href="/admin">
             KR Academy
           </Link>
           <Badge>Admin</Badge>

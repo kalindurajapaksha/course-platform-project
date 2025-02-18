@@ -4,23 +4,30 @@ import {
   CourseTable,
   LessonTable,
   UserCourseAccessTable,
+  UserLessonCompleteTable,
 } from "@/drizzle/schema";
+import {
+  getCourseSectionCourseTag,
+  getCourseSectionGlobalTag,
+} from "@/features/courseSections/db/cache/courseSections";
+import { wherePublicCourseSections } from "@/features/courseSections/db/sections";
+import {
+  getLessonCourseTag,
+  getLessonGlobalTag,
+} from "@/features/lessons/db/cache/lessons";
+import { getUserLessonCompleteUserTag } from "@/features/lessons/db/cache/userLessonComplete";
+import { wherePublicLessons } from "@/features/lessons/db/lessons";
+import { and, asc, countDistinct, eq } from "drizzle-orm";
+import { cacheTag } from "next/dist/server/use-cache/cache-tag";
 import {
   getCourseGlobalTag,
   getCourseIdTag,
   revalidateCourseCache,
 } from "./cache/courses";
-import { asc, countDistinct, eq } from "drizzle-orm";
-import { cacheTag } from "next/dist/server/use-cache/cache-tag";
-import { getUserCourseAccessGlobalTag } from "./cache/userCourseAccess";
 import {
-  getCourseSectionCourseTag,
-  getCourseSectionGlobalTag,
-} from "@/features/courseSections/db/cache/courseSections";
-import {
-  getLessonCourseTag,
-  getLessonGlobalTag,
-} from "@/features/lessons/db/cache/lessons";
+  getUserCourseAccessGlobalTag,
+  getUserCourseAccessUserTag,
+} from "./cache/userCourseAccess";
 
 export async function getCoursesForCourseTable() {
   "use cache";
@@ -92,6 +99,100 @@ export async function getCoursesForProducts() {
   return db.query.CourseTable.findMany({
     columns: { id: true, name: true },
     orderBy: asc(CourseTable.name),
+  });
+}
+
+export async function getUserCourses(userId: string) {
+  "use cache";
+  cacheTag(
+    getUserCourseAccessUserTag(userId),
+    getUserLessonCompleteUserTag(userId)
+  );
+
+  const courses = await db
+    .select({
+      id: CourseTable.id,
+      name: CourseTable.name,
+      description: CourseTable.description,
+      sectionsCount: countDistinct(CourseSectionTable.id),
+      lessonsCount: countDistinct(LessonTable.id),
+      lessonsComplete: countDistinct(UserLessonCompleteTable.lessonId),
+    })
+    .from(CourseTable)
+    .leftJoin(
+      UserCourseAccessTable,
+      and(
+        eq(UserCourseAccessTable.courseId, CourseTable.id),
+        eq(UserCourseAccessTable.userId, userId)
+      )
+    )
+    .leftJoin(
+      CourseSectionTable,
+      and(
+        eq(CourseSectionTable.courseId, CourseTable.id),
+        wherePublicCourseSections
+      )
+    )
+    .leftJoin(
+      LessonTable,
+      and(eq(LessonTable.sectionId, CourseSectionTable.id), wherePublicLessons)
+    )
+    .leftJoin(
+      UserLessonCompleteTable,
+      and(
+        eq(UserLessonCompleteTable.lessonId, LessonTable.id),
+        eq(UserLessonCompleteTable.userId, userId)
+      )
+    )
+    .orderBy(CourseTable.name)
+    .groupBy(CourseTable.id);
+
+  courses.forEach((course) => {
+    cacheTag(
+      getCourseIdTag(course.id),
+      getCourseSectionCourseTag(course.id),
+      getLessonCourseTag(course.id)
+    );
+  });
+
+  return courses;
+}
+
+export async function getPublicBasicCourse(id: string) {
+  "use cache";
+  cacheTag(getCourseIdTag(id));
+
+  return db.query.CourseTable.findFirst({
+    columns: { id: true, name: true, description: true },
+    where: eq(CourseTable.id, id),
+  });
+}
+
+export async function getPublicCourseForLayout(id: string) {
+  "use cache";
+  cacheTag(
+    getCourseIdTag(id),
+    getCourseSectionCourseTag(id),
+    getLessonCourseTag(id)
+  );
+
+  return db.query.CourseTable.findFirst({
+    columns: { id: true, name: true },
+    where: eq(CourseTable.id, id),
+    with: {
+      courseSections: {
+        orderBy: asc(CourseSectionTable.order),
+        where: wherePublicCourseSections,
+        columns: { id: true, name: true },
+        with: {
+          lessons: {
+            orderBy: asc(LessonTable.order),
+            where: wherePublicLessons,
+            columns: { id: true, name: true },
+          },
+        },
+      },
+    },
   });
 }
 
